@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Rotator",
+  "version": "1.0",
+  "description": "Automatically rotate through all open Chrome tabs at a configurable interval",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
