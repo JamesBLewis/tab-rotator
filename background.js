@@ -51,9 +51,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     // For short intervals (< 60 seconds), we need to recreate the single-fire alarm
     const state = await chrome.storage.local.get(['interval', 'isRotating']);
     if (state.isRotating && state.interval < 60) {
-      await chrome.alarms.create(ALARM_NAME, {
-        delayInMinutes: state.interval / 60
-      });
+      await createAlarmForInterval(state.interval);
     }
   }
 });
@@ -75,14 +73,24 @@ async function startRotation(interval) {
   // Stop any existing rotation
   await stopRotation();
 
+  // Get current active tab to start rotation from there
+  const tabs = await chrome.tabs.query({ currentWindow: true, active: true });
+  const allTabs = await chrome.tabs.query({ currentWindow: true });
+  const currentTabIndex = tabs.length > 0 ? allTabs.findIndex(tab => tab.id === tabs[0].id) : 0;
+
   // Save rotation state
   await chrome.storage.local.set({
     isRotating: true,
     interval: interval,
-    currentTabIndex: 0
+    currentTabIndex: currentTabIndex
   });
 
-  // Create an alarm that fires at the specified interval
+  // Create an alarm for the next rotation
+  await createAlarmForInterval(interval);
+}
+
+// Helper function to create an alarm based on interval duration
+async function createAlarmForInterval(interval) {
   // Chrome alarms have a minimum period of 1 minute, so for shorter intervals
   // we use delayInMinutes to create single-fire alarms that we recreate after each fire
   if (interval < 60) {
@@ -96,9 +104,6 @@ async function startRotation(interval) {
       periodInMinutes: interval / 60
     });
   }
-
-  // Immediately rotate to the next tab
-  await rotateToNextTab();
 }
 
 async function rotateToNextTab() {
