@@ -73,10 +73,10 @@ async function startRotation(interval) {
   // Stop any existing rotation
   await stopRotation();
 
-  // Get current active tab to start rotation from there
-  const tabs = await chrome.tabs.query({ currentWindow: true, active: true });
+  // Get all tabs and find the current active tab index
   const allTabs = await chrome.tabs.query({ currentWindow: true });
-  const currentTabIndex = tabs.length > 0 ? allTabs.findIndex(tab => tab.id === tabs[0].id) : 0;
+  const activeTab = allTabs.find(tab => tab.active);
+  const currentTabIndex = activeTab ? allTabs.indexOf(activeTab) : 0;
 
   // Save rotation state
   await chrome.storage.local.set({
@@ -108,18 +108,18 @@ async function createAlarmForInterval(interval) {
 
 async function rotateToNextTab() {
   try {
-    // Get current state
-    const state = await chrome.storage.local.get(['currentTabIndex', 'isRotating']);
-    
-    if (!state.isRotating) {
-      return;
-    }
-
     // Get all tabs in the current window
     const tabs = await chrome.tabs.query({ currentWindow: true });
 
     if (tabs.length === 0) {
       await stopRotation();
+      return;
+    }
+
+    // Get current state
+    const state = await chrome.storage.local.get(['currentTabIndex', 'isRotating']);
+    
+    if (!state.isRotating) {
       return;
     }
 
