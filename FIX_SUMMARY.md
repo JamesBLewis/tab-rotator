@@ -48,6 +48,8 @@ Replaced the implementation with persistent mechanisms that survive service work
 - Modified `startRotation()` to:
   - Save state to `chrome.storage.local`
   - Use `chrome.alarms.create()` instead of `setInterval()`
+  - Handle short intervals (< 60s) with single-fire alarms that are recreated
+  - Handle long intervals (>= 60s) with periodic alarms
 - Modified `rotateToNextTab()` to:
   - Read state from storage
   - Save updated state to storage
@@ -56,6 +58,7 @@ Replaced the implementation with persistent mechanisms that survive service work
   - Update storage state
 - Modified `getRotationStatus()` to read from storage
 - Converted all functions to async/await for proper storage handling
+- Added error handling in message listeners to prevent popup from hanging
 
 ### popup.js
 - No changes needed - continues to work with the new background implementation

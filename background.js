@@ -13,17 +13,32 @@ chrome.runtime.onInstalled.addListener(async () => {
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'start') {
-    startRotation(request.interval).then(() => {
-      sendResponse({ status: 'started' });
-    });
+    startRotation(request.interval)
+      .then(() => {
+        sendResponse({ status: 'started' });
+      })
+      .catch((error) => {
+        console.error('Error starting rotation:', error);
+        sendResponse({ status: 'error', error: error.message });
+      });
   } else if (request.action === 'stop') {
-    stopRotation().then(() => {
-      sendResponse({ status: 'stopped' });
-    });
+    stopRotation()
+      .then(() => {
+        sendResponse({ status: 'stopped' });
+      })
+      .catch((error) => {
+        console.error('Error stopping rotation:', error);
+        sendResponse({ status: 'error', error: error.message });
+      });
   } else if (request.action === 'getStatus') {
-    getRotationStatus().then((isRotating) => {
-      sendResponse({ isRotating: isRotating });
-    });
+    getRotationStatus()
+      .then((isRotating) => {
+        sendResponse({ isRotating: isRotating });
+      })
+      .catch((error) => {
+        console.error('Error getting status:', error);
+        sendResponse({ isRotating: false });
+      });
   }
   return true; // Keep message channel open for async response
 });
@@ -32,6 +47,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
     await rotateToNextTab();
+    
+    // For short intervals (< 60 seconds), we need to recreate the single-fire alarm
+    const state = await chrome.storage.local.get(['interval', 'isRotating']);
+    if (state.isRotating && state.interval < 60) {
+      await chrome.alarms.create(ALARM_NAME, {
+        delayInMinutes: state.interval / 60
+      });
+    }
   }
 });
 
@@ -60,9 +83,19 @@ async function startRotation(interval) {
   });
 
   // Create an alarm that fires at the specified interval
-  await chrome.alarms.create(ALARM_NAME, {
-    periodInMinutes: interval / 60
-  });
+  // Chrome alarms have a minimum period of 1 minute, so for shorter intervals
+  // we use delayInMinutes to create single-fire alarms that we recreate after each fire
+  if (interval < 60) {
+    // For intervals less than 60 seconds, use a single-fire alarm
+    await chrome.alarms.create(ALARM_NAME, {
+      delayInMinutes: interval / 60
+    });
+  } else {
+    // For intervals >= 60 seconds, use a periodic alarm
+    await chrome.alarms.create(ALARM_NAME, {
+      periodInMinutes: interval / 60
+    });
+  }
 
   // Immediately rotate to the next tab
   await rotateToNextTab();
