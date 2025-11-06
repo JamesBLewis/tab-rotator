@@ -1,82 +1,113 @@
-let rotationInterval = null;
-let currentTabIndex = 0;
-let isRotating = false;
-let allTabs = [];
+const ALARM_NAME = 'tabRotation';
+
+// Restore rotation state when service worker starts
+chrome.runtime.onStartup.addListener(async () => {
+  await restoreRotationState();
+});
+
+// Also restore on extension install/update
+chrome.runtime.onInstalled.addListener(async () => {
+  await restoreRotationState();
+});
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'start') {
-    startRotation(request.interval);
-    sendResponse({ status: 'started' });
+    startRotation(request.interval).then(() => {
+      sendResponse({ status: 'started' });
+    });
   } else if (request.action === 'stop') {
-    stopRotation();
-    sendResponse({ status: 'stopped' });
+    stopRotation().then(() => {
+      sendResponse({ status: 'stopped' });
+    });
   } else if (request.action === 'getStatus') {
-    sendResponse({ isRotating: isRotating });
+    getRotationStatus().then((isRotating) => {
+      sendResponse({ isRotating: isRotating });
+    });
   }
-  return true;
+  return true; // Keep message channel open for async response
 });
 
-async function startRotation(interval) {
-  if (isRotating) {
-    stopRotation();
-  }
-
-  isRotating = true;
-
-  // Get all tabs in the current window
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-  allTabs = tabs;
-
-  if (allTabs.length === 0) {
-    stopRotation();
-    return;
-  }
-
-  // Find the current active tab index
-  const activeTab = allTabs.find(tab => tab.active);
-  currentTabIndex = activeTab ? allTabs.indexOf(activeTab) : 0;
-
-  // Start the rotation
-  rotationInterval = setInterval(async () => {
+// Listen for alarm to rotate tabs
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === ALARM_NAME) {
     await rotateToNextTab();
-  }, interval * 1000);
+  }
+});
+
+async function restoreRotationState() {
+  const state = await chrome.storage.local.get(['isRotating', 'interval']);
+  if (state.isRotating && state.interval) {
+    // Restart rotation with saved interval
+    await startRotation(state.interval);
+  }
+}
+
+async function getRotationStatus() {
+  const state = await chrome.storage.local.get(['isRotating']);
+  return state.isRotating || false;
+}
+
+async function startRotation(interval) {
+  // Stop any existing rotation
+  await stopRotation();
+
+  // Save rotation state
+  await chrome.storage.local.set({
+    isRotating: true,
+    interval: interval,
+    currentTabIndex: 0
+  });
+
+  // Create an alarm that fires at the specified interval
+  await chrome.alarms.create(ALARM_NAME, {
+    periodInMinutes: interval / 60
+  });
+
+  // Immediately rotate to the next tab
+  await rotateToNextTab();
 }
 
 async function rotateToNextTab() {
   try {
-    // Refresh the tab list to account for any closed tabs
-    const tabs = await chrome.tabs.query({ currentWindow: true });
-    allTabs = tabs;
-
-    if (allTabs.length === 0) {
-      stopRotation();
+    // Get current state
+    const state = await chrome.storage.local.get(['currentTabIndex', 'isRotating']);
+    
+    if (!state.isRotating) {
       return;
     }
 
-    // Move to the next tab (wrap around to 0 if at the end)
-    currentTabIndex = (currentTabIndex + 1) % allTabs.length;
+    // Get all tabs in the current window
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+
+    if (tabs.length === 0) {
+      await stopRotation();
+      return;
+    }
+
+    // Calculate next tab index
+    let currentTabIndex = state.currentTabIndex || 0;
+    currentTabIndex = (currentTabIndex + 1) % tabs.length;
+
+    // Save updated index
+    await chrome.storage.local.set({ currentTabIndex: currentTabIndex });
 
     // Activate the next tab
-    await chrome.tabs.update(allTabs[currentTabIndex].id, { active: true });
+    await chrome.tabs.update(tabs[currentTabIndex].id, { active: true });
   } catch (error) {
     console.error('Error rotating tabs:', error);
-    // If there's an error (e.g., tab was closed), reset and try again
-    currentTabIndex = 0;
+    // Reset index on error
+    await chrome.storage.local.set({ currentTabIndex: 0 });
   }
 }
 
-function stopRotation() {
-  if (rotationInterval) {
-    clearInterval(rotationInterval);
-    rotationInterval = null;
-  }
-  isRotating = false;
-  currentTabIndex = 0;
-  allTabs = [];
+async function stopRotation() {
+  // Clear the alarm
+  await chrome.alarms.clear(ALARM_NAME);
+  
+  // Update state
+  await chrome.storage.local.set({
+    isRotating: false,
+    currentTabIndex: 0
+  });
 }
-
-// Stop rotation when the extension is unloaded
-chrome.runtime.onSuspend.addListener(() => {
-  stopRotation();
-});

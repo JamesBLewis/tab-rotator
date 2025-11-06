@@ -5,7 +5,8 @@
   "description": "Automatically rotate through all open Chrome tabs at a configurable interval",
   "permissions": [
     "tabs",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "background": {
     "service_worker": "background.js"
