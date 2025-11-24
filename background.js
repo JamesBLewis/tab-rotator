@@ -1,7 +1,12 @@
-let rotationInterval = null;
-let currentTabIndex = 0;
-let isRotating = false;
-let allTabs = [];
+const ALARM_NAME = 'tab-rotation-alarm';
+
+// Initialize state from storage on startup
+chrome.runtime.onStartup.addListener(async () => {
+  const data = await chrome.storage.local.get(['isRotating', 'interval']);
+  if (data.isRotating && data.interval) {
+    startRotation(data.interval);
+  }
+});
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -12,71 +17,65 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     stopRotation();
     sendResponse({ status: 'stopped' });
   } else if (request.action === 'getStatus') {
-    sendResponse({ isRotating: isRotating });
+    // Check storage for the source of truth
+    chrome.storage.local.get(['isRotating'], (data) => {
+      sendResponse({ isRotating: !!data.isRotating });
+    });
+    return true; // Keep channel open for async response
   }
-  return true;
+});
+
+// Listen for alarms
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === ALARM_NAME) {
+    rotateToNextTab();
+  }
 });
 
 async function startRotation(interval) {
-  if (isRotating) {
-    stopRotation();
-  }
+  // Save state
+  await chrome.storage.local.set({ isRotating: true, interval: interval });
 
-  isRotating = true;
-
-  // Get all tabs in the current window
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-  allTabs = tabs;
-
-  if (allTabs.length === 0) {
-    stopRotation();
-    return;
-  }
-
-  // Find the current active tab index
-  const activeTab = allTabs.find(tab => tab.active);
-  currentTabIndex = activeTab ? allTabs.indexOf(activeTab) : 0;
-
-  // Start the rotation
-  rotationInterval = setInterval(async () => {
-    await rotateToNextTab();
-  }, interval * 1000);
+  // Create alarm
+  // Note: In strict mode (unpacked extension), alarms can fire more often than 1 minute.
+  // For production, the minimum is 1 minute unless using 'when' for one-off.
+  // However, for this use case, we want a repeating interval.
+  // Chrome limits repeating alarms to 1 minute minimum in released extensions.
+  // For development/unpacked, it allows shorter.
+  // If the user wants < 1 minute, we might need a different approach or accept the limitation.
+  // Given the "half an hour" comment, long running is the goal.
+  
+  chrome.alarms.create(ALARM_NAME, {
+    periodInMinutes: interval / 60
+  });
 }
 
 async function rotateToNextTab() {
   try {
-    // Refresh the tab list to account for any closed tabs
     const tabs = await chrome.tabs.query({ currentWindow: true });
-    allTabs = tabs;
-
-    if (allTabs.length === 0) {
+    
+    if (tabs.length === 0) {
       stopRotation();
       return;
     }
 
-    // Move to the next tab (wrap around to 0 if at the end)
-    currentTabIndex = (currentTabIndex + 1) % allTabs.length;
+    // Find current active tab
+    const activeTab = tabs.find(tab => tab.active);
+    let nextIndex = 0;
+
+    if (activeTab) {
+      const currentIndex = tabs.indexOf(activeTab);
+      nextIndex = (currentIndex + 1) % tabs.length;
+    }
 
     // Activate the next tab
-    await chrome.tabs.update(allTabs[currentTabIndex].id, { active: true });
+    await chrome.tabs.update(tabs[nextIndex].id, { active: true });
   } catch (error) {
     console.error('Error rotating tabs:', error);
-    // If there's an error (e.g., tab was closed), reset and try again
-    currentTabIndex = 0;
   }
 }
 
 function stopRotation() {
-  if (rotationInterval) {
-    clearInterval(rotationInterval);
-    rotationInterval = null;
-  }
-  isRotating = false;
-  currentTabIndex = 0;
-  allTabs = [];
+  chrome.alarms.clear(ALARM_NAME);
+  chrome.storage.local.set({ isRotating: false });
 }
-
-// Stop rotation when the extension is unloaded
-chrome.runtime.onSuspend.addListener(() => {
-  stopRotation();
-});

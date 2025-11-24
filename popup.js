@@ -10,10 +10,12 @@ chrome.storage.sync.get(['interval'], (result) => {
   }
 });
 
-// Check current rotation status when popup opens
-chrome.runtime.sendMessage({ action: 'getStatus' }, (response) => {
-  if (response && response.isRotating) {
+// Check current rotation status from storage (more reliable than message for initial state)
+chrome.storage.local.get(['isRotating'], (result) => {
+  if (result.isRotating) {
     updateUIState(true);
+  } else {
+    updateUIState(false);
   }
 });
 
