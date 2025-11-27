@@ -23,6 +23,7 @@ The extension requires the following permissions:
 
 - **tabs**: Required to access and switch between your open tabs to perform the rotation function.
 - **storage**: Required to save your rotation interval preference locally on your device.
+- **alarms**: Required to schedule the automatic rotation of tabs at your specified interval.
 
 These permissions are used exclusively for the extension's core functionality and nothing else.
 

@@ -55,6 +55,8 @@ The extension will continue rotating through your tabs in order, moving from lef
 
 **Storage**: Required to save your interval preference locally in your browser. No data is ever sent to external servers.
 
+**Alarms**: Required to schedule the automatic rotation of tabs. This ensures the rotation happens precisely at the interval you set.
+
 ### Technical Details
 
 - Manifest Version 3 compliant

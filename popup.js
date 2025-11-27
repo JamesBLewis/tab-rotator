@@ -4,7 +4,7 @@ const intervalInput = document.getElementById('interval');
 const statusDiv = document.getElementById('status');
 
 // Load saved interval from storage
-chrome.storage.sync.get(['interval'], (result) => {
+chrome.storage.local.get(['interval'], (result) => {
   if (result.interval) {
     intervalInput.value = result.interval;
   }
@@ -28,7 +28,7 @@ startBtn.addEventListener('click', () => {
   }
 
   // Save interval to storage
-  chrome.storage.sync.set({ interval: interval });
+  chrome.storage.local.set({ interval: interval });
 
   // Send message to background script to start rotation
   chrome.runtime.sendMessage(

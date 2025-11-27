@@ -42,6 +42,12 @@ The extension will rotate through all tabs in the current window, moving to the 
 - If tabs are closed during rotation, the extension will automatically adjust
 - Your interval preference is saved and will be remembered next time you open the popup
 
+## Permissions
+
+- **tabs**: To rotate through open tabs
+- **storage**: To save your interval preference locally
+- **alarms**: To schedule the rotation timer
+
 ## Customization
 
 You can customize the extension by:
