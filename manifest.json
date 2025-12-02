@@ -4,7 +4,6 @@
   "version": "1.0",
   "description": "Automatically rotate through all open Chrome tabs at a configurable interval",
   "permissions": [
-    "tabs",
     "storage",
     "alarms"
   ],

@@ -44,7 +44,6 @@ The extension will rotate through all tabs in the current window, moving to the 
 
 ## Permissions
 
-- **tabs**: To rotate through open tabs
 - **storage**: To save your interval preference locally
 - **alarms**: To schedule the rotation timer
 

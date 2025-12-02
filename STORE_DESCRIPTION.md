@@ -51,8 +51,6 @@ The extension will continue rotating through your tabs in order, moving from lef
 
 ### Permissions Explained
 
-**Tabs**: Required to view and switch between your open tabs. This permission is used solely for the core rotation functionality.
-
 **Storage**: Required to save your interval preference locally in your browser. No data is ever sent to external servers.
 
 **Alarms**: Required to schedule the automatic rotation of tabs. This ensures the rotation happens precisely at the interval you set.
